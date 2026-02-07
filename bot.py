@@ -2,37 +2,28 @@ import os
 import requests
 import time
 import threading
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler
-)
+from telegram.ext import ApplicationBuilder, CommandHandler
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROUP_ID = int(os.getenv("GROUP_CHAT_ID"))
 
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-# comando /start
 async def start(update, context):
-    await update.message.reply_text("🤖 Bot attivo e pronto!")
+    await update.message.reply_text("🤖 Bot attivo e monitor blocchi Bitcoin!")
 
-app.add_handler(CommandHandler("start", start))
-
-# (facoltativo) mostra chat id
 async def showid(update, context):
     chat = update.effective_chat
     await update.message.reply_text(f"👀 Chat ID: {chat.id}")
 
+app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("showid", showid))
 
-# --- FUNZIONI DI BLOCCO BITCOIN ---
-
 def get_bitcoin_height():
-    try:
-        res = requests.get("https://api.blockcypher.com/v1/btc/main")
-        return res.json().get("height")
-    except:
-        return None
+    url = "https://api.blockcypher.com/v1/btc/main"
+    r = requests.get(url)
+    data = r.json()
+    return data.get("height")
 
 def send_message(text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -40,7 +31,7 @@ def send_message(text):
 
 last_height = None
 
-def block_watcher():
+def watcher():
     global last_height
     last_height = get_bitcoin_height()
 
@@ -54,9 +45,7 @@ def block_watcher():
             print("Error:", e)
         time.sleep(30)
 
-# start watcher in background
-thread = threading.Thread(target=block_watcher, daemon=True)
+thread = threading.Thread(target=watcher, daemon=True)
 thread.start()
 
-# start the bot
 app.run_polling()
