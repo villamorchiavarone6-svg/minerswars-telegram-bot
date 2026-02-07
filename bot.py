@@ -1,17 +1,42 @@
 import os
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+import requests
+import time
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 
-TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+GROUP_ID = int(os.getenv("GROUP_CHAT_ID"))
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🤖 Bot Miners Wars attivo!")
+app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-async def notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔔 Notifiche abilitate!")
+async def start(update, context):
+    await update.message.reply_text("🤖 Bot attivo e pronto!")
 
-if __name__ == "__main__":
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("notify", notify))
-    app.run_polling()
+async def getgroupid(update, context):
+    chat_id = update.effective_chat.id
+    await update.message.reply_text(f"👀 Chat ID: {chat_id}")
+
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("getgroupid", getgroupid))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, start))
+
+def get_bitcoin_height():
+    r = requests.get("https://api.blockcypher.com/v1/btc/main")
+    return r.json()["height"]
+
+def send_message(text):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    requests.post(url, json={"chat_id": GROUP_ID, "text": text})
+
+last_height = None
+
+while True:
+    try:
+        height = get_bitcoin_height()
+        if last_height is None:
+            last_height = height
+        elif height > last_height:
+            last_height = height
+            send_message(f"🧱 New Bitcoin block found!\nBlock: {height}")
+    except:
+        pass
+    time.sleep(30)
